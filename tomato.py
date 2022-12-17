@@ -14,51 +14,44 @@
 import subprocess
 import sys
 import time
-from itertools import count
+from argparse import ArgumentParser
 
 from plyer import notification
 
-WORK_MINUTES = 25
-BREAK_MINUTES = 5
+parser = ArgumentParser()
+parser.add_argument("-wt", "--work_time", type=int, default=25, help='Number of minutes to work for')
+parser.add_argument("-bt", "--break_time", type=int, default=5, help='Number of minutes to rest for')
+
+args = parser.parse_args()
 
 
 class PlatformNotSupportedException(Exception):
-    """Raised when the platform is not supported by this script"""
-    pass
+    """
+    Raised when the platform is not supported by this script
+    """
 
 
-def main():
+def main() -> None:
+    """
+    Main Loop
+    """
     while True:
         try:
-            # TODO: Use argsparser module
-            if len(sys.argv) <= 1:
-                print(f'🍅 tomato {WORK_MINUTES} minute(s). Ctrl+C to exit')
-                tomato(WORK_MINUTES, 'It is time to take a break')
-                print(f'🛀 break {BREAK_MINUTES} minute(s). Ctrl+C to exit')
-                tomato(BREAK_MINUTES, 'It is time to work')
-
-            elif sys.argv[1] == '-t':
-                minutes = int(sys.argv[2]) if len(sys.argv) > 2 else WORK_MINUTES
-                print(f'🍅 tomato {minutes} minute(s). Ctrl+C to exit')
-                tomato(minutes, 'It is time to take a break')
-
-            elif sys.argv[1] == '-b':
-                minutes = int(sys.argv[2]) if len(sys.argv) > 2 else BREAK_MINUTES
-                print(f'🛀 break {minutes} minute(s). Ctrl+C to exit')
-                tomato(minutes, 'It is time to work')
-
-            elif sys.argv[1] == '-h':
-                help()
-
-            else:
-                help()
-
+            print(f'🍅 tomato {args.work_time} minute(s). Ctrl+C to exit')
+            tomato(args.work_time, 'Time to take a break!')
+            print(f'🛀 break {args.break_time} minute(s). Ctrl+C to exit')
+            tomato(args.break_time, 'Time to work!')
         except KeyboardInterrupt:
             print('\n👋 goodbye')
             break
 
 
-def tomato(minutes, notify_msg):
+def tomato(minutes: int, notify_msg: str) -> None:
+    """
+    Handles logic & timing for tomato periods
+    :param int minutes: How long this "tomato period" lasts for
+    :param str notify_msg: Message to output and notify to the user
+    """
     start_time = time.perf_counter()
     while True:
         delta_seconds = int(round(time.perf_counter() - start_time))
@@ -68,7 +61,6 @@ def tomato(minutes, notify_msg):
 
         if remaining_seconds <= 0:
             print_progress_bar(delta_seconds, minutes * 60, countdown)
-            print('')
             break
         print_progress_bar(delta_seconds, minutes * 60, countdown)
         time.sleep(1)
@@ -76,25 +68,31 @@ def tomato(minutes, notify_msg):
     notify_me(notify_msg)
 
 
-def print_progress_bar(current, total, countdown, prefix='\t', suffix='', length=60, fill='█', printEnd="\r"):
+def print_progress_bar(current: int, total: int, countdown: str, length: int = 60, fill: str = '█') -> None:
     """
-    Call in a loop to create terminal progress bar
+    Handles progress bar logic
+
+    :param int current: current time progress through "tomato period"
+    :param int total: total time this "tomato period" lasts
+    :param str countdown: current time countdown
+    :param int length: length of progress bar fill, defaults to 60
+    :param str fill: character to fill the progress bar with, defaults to '█'
     """
     # print('\r', current, total, countdown, '\n')
     percent = f'{(100 * (current / float(total))):.2f}'
     filled_length = int(length * current // total)
     bar_fill = fill * filled_length + '-' * (length - filled_length)
-    print(f'\r{prefix}{(countdown)}⏰ |{bar_fill}| {percent}% {suffix}', end=printEnd)
+    print(f'\r\t{(countdown)}⏰ |{bar_fill}| {percent}%', end='\r')
     # Print New Line on Complete
     if current == total:
         print()
 
 
-def notify_me(msg):
+def notify_me(msg: str):
     '''
     # macos desktop notification
     terminal-notifier -> https://github.com/julienXX/terminal-notifier#download
-    terminal-notifier -message <msg>
+    terminal-notifier -> message <msg>
 
     # ubuntu desktop notification
     notify-send
@@ -108,41 +106,27 @@ def notify_me(msg):
     '''
 
     print(msg)
-    try:
-        if sys.platform == 'darwin':
-            # macos desktop notification
-            subprocess.run(['terminal-notifier', '-title', '🍅', '-message', msg])
-            subprocess.run(['say', '-v', 'Daniel', msg])
-        elif sys.platform.startswith('linux'):
-            # ubuntu desktop notification
-            subprocess.Popen(["notify-send", '🍅', msg])
-        elif sys.platform == 'win32':
-            notification.notify(    # type: ignore
-                title="Tomato Notification",
-                message=msg,
-                timeout=10,
-                app_icon='tomato.ico'
-            )
+    if sys.platform == 'darwin':
+        # macos desktop notification
+        subprocess.run(['terminal-notifier', '-title', '🍅', '-message', msg])
+        subprocess.run(['say', '-v', 'Daniel', msg])
+    elif sys.platform.startswith('linux'):
+        # ubuntu desktop notification
+        subprocess.Popen(["notify-send", '🍅', msg])
+    elif sys.platform == 'win32':
+        if "work" in msg:
+            title = 'Work!'
         else:
-            raise PlatformNotSupportedException(
-                f'The following platform is not yet supported by this script: {sys.platform}')
-    except:
-        # skip the notification error
-        # TODO: Raise any exceptions thrown from trying to send notification
-        pass
-
-
-# TODO: Remove this once using argsparser module
-def help():
-    app_name = sys.argv[0]
-    app_name = app_name if app_name.endswith('.py') else 'tomato'  # tomato is pypi package
-    print('====== 🍅 Tomato Clock =======')
-    print(f'{app_name}         # start a {WORK_MINUTES} minutes tomato clock + {BREAK_MINUTES} minutes break')
-    print(f'{app_name} -t      # start a {WORK_MINUTES} minutes tomato clock')
-    print(f'{app_name} -t <n>  # start a <n> minutes tomato clock')
-    print(f'{app_name} -b      # take a {BREAK_MINUTES} minutes break')
-    print(f'{app_name} -b <n>  # take a <n> minutes break')
-    print(f'{app_name} -h      # help')
+            title = 'Break!'
+        notification.notify(    # type: ignore
+            title=title,
+            message=msg,
+            timeout=10,
+            app_icon='tomato.ico'
+        )
+    else:
+        raise PlatformNotSupportedException(
+            f'The following platform is not yet supported by this script: {sys.platform}')
 
 
 if __name__ == "__main__":
